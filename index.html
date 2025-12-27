@@ -202,10 +202,6 @@
       <span class="badge">TF/Keras NHWC</span>
       <span class="badge">Gray (C=1) → RGB (C=3)</span>
     </div>
-    <div class="hint">
-      Put <code>generator.onnx</code> next to this HTML file and open via an HTTP server
-      (e.g., <code>python -m http.server 8000</code>). Do not open the HTML by double-clicking.
-    </div>
   </header>
 
   <main>
@@ -655,11 +651,11 @@
         dom.runBtn.disabled = false;
         dom.saveBtn.disabled = false;
 
-        setStatus('Status: model loaded ✅', 'ok');
+        setStatus('Status: model loaded ', 'ok');
       } catch (e) {
         console.error('ORT load error:', e);
         const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
-        setStatus('Status: model load failed ❌\n' + msg, 'err');
+        setStatus('Status: model load failed \n' + msg, 'err');
       }
     }
 
