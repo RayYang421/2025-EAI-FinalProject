@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image-to-Image GAN Demo (TF-Keras NHWC, Gray→RGB) | ORT-Web</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:rgba(255,255,255,0.06);
+      --card-border:rgba(255,255,255,0.11);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.72);
+      --muted2:rgba(255,255,255,0.56);
+      --accent:#7c3aed;
+      --good:#22c55e;
+      --bad:#ef4444;
+      --shadow:0 18px 60px rgba(0,0,0,0.35);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:
+        radial-gradient(1200px 600px at 20% 0%, rgba(124,58,237,0.25), transparent 60%),
+        radial-gradient(1000px 700px at 90% 10%, rgba(34,197,94,0.16), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      letter-spacing:0.2px;
+    }
+    header{
+      padding:26px 22px 14px;
+      max-width:1200px;
+      margin:0 auto;
+    }
+    .title{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;}
+    h1{margin:0; font-size:22px; font-weight:750;}
+    .badge{
+      padding:6px 10px;
+      border:1px solid var(--card-border);
+      background:rgba(255,255,255,0.05);
+      border-radius:999px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .hint{
+      margin-top:10px;
+      color:var(--muted2);
+      font-size:12px;
+      line-height:1.45;
+    }
+    main{
+      max-width:1200px;
+      margin:0 auto;
+      padding:0 22px 28px;
+    }
+    .grid{
+      display:grid;
+      gap:18px;
+      grid-template-columns: 1.08fr 1fr;
+    }
+    @media (max-width:1000px){ .grid{grid-template-columns:1fr;} }
+    .card{
+      background:var(--card);
+      border:1px solid var(--card-border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+      backdrop-filter: blur(10px);
+    }
+    .card h2{
+      margin:0 0 12px;
+      font-size:14px;
+      letter-spacing:0.6px;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .btn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.07);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:14px;
+      cursor:pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      font-weight:650;
+      font-size:13px;
+    }
+    .btn:hover{transform:translateY(-1px); background:rgba(255,255,255,0.10); border-color:rgba(255,255,255,0.28);}
+    .btn:disabled{opacity:0.5; cursor:not-allowed; transform:none;}
+    .btn.primary{background:rgba(124,58,237,0.35); border-color:rgba(124,58,237,0.55);}
+    .btn.primary:hover{background:rgba(124,58,237,0.45); border-color:rgba(124,58,237,0.70);}
+    .btn.good{background:rgba(34,197,94,0.25); border-color:rgba(34,197,94,0.45);}
+    .btn.good:hover{background:rgba(34,197,94,0.33); border-color:rgba(34,197,94,0.60);}
+    input[type="file"]{
+      border:1px dashed rgba(255,255,255,0.25);
+      background:rgba(255,255,255,0.05);
+      padding:10px 12px;
+      border-radius:14px;
+      color:var(--muted);
+      cursor:pointer;
+      max-width:380px;
+    }
+
+    .kv{
+      display:grid;
+      grid-template-columns: 190px 1fr;
+      gap:10px 14px;
+      margin-top:14px;
+      align-items:center;
+    }
+    .k{color:var(--muted2); font-size:12px;}
+    .v{
+      color:var(--text);
+      font-size:12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      white-space:pre-wrap;
+    }
+    .status{
+      margin-top:14px;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05);
+      color:var(--muted);
+      font-size:12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space:pre-wrap;
+    }
+    .status.ok{border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.10); color:rgba(235,255,245,0.92);}
+    .status.err{border-color:rgba(239,68,68,0.50); background:rgba(239,68,68,0.10); color:rgba(255,235,235,0.92);}
+
+    details{
+      margin-top:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:14px;
+      padding:10px 12px;
+      background:rgba(0,0,0,0.12);
+    }
+    summary{cursor:pointer; color:var(--muted); font-size:12px;}
+
+    .canvas-wrap{display:grid; grid-template-columns: 1fr 1fr; gap:16px;}
+    @media (max-width:560px){ .canvas-wrap{grid-template-columns:1fr;} }
+    .panel{
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:16px;
+      padding:12px;
+      background:rgba(0,0,0,0.12);
+    }
+    .panel-title{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    canvas{
+      width:100%;
+      aspect-ratio: 1 / 1;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.25);
+      image-rendering: pixelated;
+    }
+
+    /* Controls line */
+    .controls-line{display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;}
+    .chip{
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.06);
+    }
+    .chip label{font-size:12px; color:var(--muted2)}
+    .chip input[type="checkbox"]{transform:scale(1.1)}
+    .chip input[type="range"]{width:180px}
+    .chip .val{font-size:12px; color:var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;}
+    select{
+      width:100%;
+      max-width:420px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      outline:none;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="title">
+      <h1>Image-to-Image GAN Demo</h1>
+      <span class="badge">ONNXRuntime Web (WASM)</span>
+      <span class="badge">TF/Keras NHWC</span>
+      <span class="badge">Gray (C=1) → RGB (C=3)</span>
+    </div>
+    <div class="hint">
+      Put <code>generator.onnx</code> next to this HTML file and open via an HTTP server
+      (e.g., <code>python -m http.server 8000</code>). Do not open the HTML by double-clicking.
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <!-- Controls -->
+      <section class="card">
+        <h2>Controls</h2>
+
+        <div class="row">
+          <input id="fileInput" type="file" accept="image/*" />
+          <button id="loadBtn" class="btn primary">Load Model</button>
+          <button id="runBtn" class="btn good" disabled>Run</button>
+          <button id="saveBtn" class="btn" disabled>Save PNG</button>
+        </div>
+
+        <div class="kv">
+          <div class="k">Model URL</div>
+          <div class="v" id="modelUrlText">./generator.onnx</div>
+
+          <div class="k">Input normalize</div>
+          <div>
+            <select id="inputNormSel">
+              <option value="m1_1" selected>-1..1 (x / 127.5 - 1)</option>
+              <option value="0_1">0..1 (divide by 255)</option>
+            </select>
+          </div>
+
+          <div class="k">Input layout</div>
+          <div>
+            <select id="inputLayoutSel">
+              <option value="NHWC" selected>NHWC [1, H, W, 1] (TF default)</option>
+              <option value="NCHW">NCHW [1, 1, H, W]</option>
+            </select>
+          </div>
+
+          <div class="k">Output layout</div>
+          <div>
+            <select id="outputLayoutSel">
+              <option value="NHWC" selected>NHWC [1, H, W, 3] (TF default)</option>
+              <option value="NCHW">NCHW [1, 3, H, W]</option>
+            </select>
+          </div>
+
+          <div class="k">Output value range</div>
+          <div>
+            <select id="outputRangeSel">
+              <option value="m1_1" selected>-1..1 (tanh)</option>
+              <option value="0_1">0..1 (sigmoid)</option>
+              <option value="auto">Auto (guess)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="controls-line">
+          <div class="chip" title="Invert the grayscale input (useful when training edges are white-on-black).">
+            <label for="invertCb">Invert</label>
+            <input id="invertCb" type="checkbox" checked />
+          </div>
+
+          <div class="chip" title="Binarize the grayscale input to better match edge maps.">
+            <label for="binCb">Binarize</label>
+            <input id="binCb" type="checkbox" checked />
+            <span class="val">thr</span>
+            <input id="thrRange" type="range" min="0" max="255" value="128" />
+            <span class="val" id="thrVal">128</span>
+          </div>
+
+          <div class="chip" title="Optional smoothing for display only (does not affect inference).">
+            <label for="smoothCb">Smooth</label>
+            <input id="smoothCb" type="checkbox" />
+          </div>
+        </div>
+
+        <div id="statusBox" class="status">Status: idle</div>
+
+        <details>
+          <summary>Debug (tensor info)</summary>
+          <div class="v" id="debugText" style="margin-top:10px;"></div>
+        </details>
+
+        <details>
+          <summary>IO Metadata (may be null in ORT-Web)</summary>
+          <div class="v" id="ioMetaText" style="margin-top:10px;"></div>
+        </details>
+      </section>
+
+      <!-- Visuals -->
+      <section class="card">
+        <h2>Preview</h2>
+
+        <div class="canvas-wrap">
+          <div class="panel">
+            <div class="panel-title">
+              <span>Input (grayscale, resized to 128×128)</span>
+              <span class="badge" id="inputInfoBadge">—</span>
+            </div>
+            <canvas id="inputCanvas" width="128" height="128"></canvas>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">
+              <span>Output (RGB)</span>
+              <span class="badge" id="outputInfoBadge">—</span>
+            </div>
+            <canvas id="outputCanvas" width="128" height="128"></canvas>
+          </div>
+        </div>
+
+        <div class="hint">
+          This page is designed for your TF/Keras U-Net: input NHWC gray (C=1), output NHWC RGB (C=3), with tanh range [-1,1].
+          If output looks like noise, toggling <b>Invert</b> / <b>Binarize</b> usually fixes distribution mismatch.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort.min.js"></script>
+  <script>
+    'use strict';
+
+    // -----------------------------
+    // Constants
+    // -----------------------------
+    const MODEL_URL = './generator.onnx';
+    const TARGET_SIZE = 128;
+
+    // -----------------------------
+    // DOM helpers
+    // -----------------------------
+    /** @param {string} id */
+    function $(id) { return document.getElementById(id); }
+
+    const dom = {
+      fileInput: $('fileInput'),
+      loadBtn: $('loadBtn'),
+      runBtn: $('runBtn'),
+      saveBtn: $('saveBtn'),
+
+      inputNormSel: $('inputNormSel'),
+      inputLayoutSel: $('inputLayoutSel'),
+      outputLayoutSel: $('outputLayoutSel'),
+      outputRangeSel: $('outputRangeSel'),
+
+      invertCb: $('invertCb'),
+      binCb: $('binCb'),
+      thrRange: $('thrRange'),
+      thrVal: $('thrVal'),
+      smoothCb: $('smoothCb'),
+
+      modelUrlText: $('modelUrlText'),
+      statusBox: $('statusBox'),
+      debugText: $('debugText'),
+      ioMetaText: $('ioMetaText'),
+
+      inputCanvas: $('inputCanvas'),
+      outputCanvas: $('outputCanvas'),
+      inputInfoBadge: $('inputInfoBadge'),
+      outputInfoBadge: $('outputInfoBadge'),
+    };
+
+    /** @type {CanvasRenderingContext2D} */
+    const inputCtx = dom.inputCanvas.getContext('2d', { willReadFrequently: true });
+    /** @type {CanvasRenderingContext2D} */
+    const outputCtx = dom.outputCanvas.getContext('2d', { willReadFrequently: true });
+
+    // -----------------------------
+    // Runtime state
+    // -----------------------------
+    /** @type {ort.InferenceSession|null} */
+    let session = null;
+    /** @type {string|null} */
+    let inputName = null;
+    /** @type {string|null} */
+    let outputName = null;
+    /** @type {string|null} */
+    let lastOutputDataUrl = null;
+
+    // -----------------------------
+    // UI utilities
+    // -----------------------------
+    /**
+     * Updates the status box.
+     * @param {string} text
+     * @param {'ok'|'err'|''} tone
+     */
+    function setStatus(text, tone = '') {
+      dom.statusBox.textContent = text;
+      dom.statusBox.classList.remove('ok', 'err');
+      if (tone) dom.statusBox.classList.add(tone);
+    }
+
+    /**
+     * Fills a canvas with black.
+     * @param {CanvasRenderingContext2D} ctx
+     */
+    function clearCanvas(ctx) {
+      ctx.save();
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+
+    /** @param {number} x */
+    function clampU8(x) {
+      const v = Math.round(x);
+      return Math.max(0, Math.min(255, v));
+    }
+
+    // -----------------------------
+    // Image decoding + preprocessing
+    // -----------------------------
+    /**
+     * Loads an image file and returns an HTMLImageElement.
+     * @param {File} file
+     * @return {Promise<HTMLImageElement>}
+     */
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to decode image.'));
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    /**
+     * Renders an image into a square canvas with "contain" scaling, and returns
+     * grayscale pixels (Uint8ClampedArray) of length size*size.
+     *
+     * @param {HTMLImageElement} img
+     * @param {number} size
+     * @return {{grayU8: Uint8ClampedArray, width: number, height: number}}
+     */
+    function renderToSquareGray(img, size) {
+      const tmp = document.createElement('canvas');
+      tmp.width = size;
+      tmp.height = size;
+      const tctx = tmp.getContext('2d', { willReadFrequently: true });
+
+      // Background.
+      tctx.fillStyle = 'white';
+      tctx.fillRect(0, 0, size, size);
+
+      // Contain scaling.
+      const s = Math.min(size / img.width, size / img.height);
+      const nw = Math.round(img.width * s);
+      const nh = Math.round(img.height * s);
+      const dx = Math.floor((size - nw) / 2);
+      const dy = Math.floor((size - nh) / 2);
+
+      tctx.drawImage(img, dx, dy, nw, nh);
+
+      const rgba = tctx.getImageData(0, 0, size, size).data;
+      const gray = new Uint8ClampedArray(size * size);
+
+      // Convert RGBA -> grayscale.
+      for (let i = 0; i < size * size; i++) {
+        const r = rgba[i * 4 + 0];
+        const g = rgba[i * 4 + 1];
+        const b = rgba[i * 4 + 2];
+        gray[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+      }
+
+      return { grayU8: gray, width: size, height: size };
+    }
+
+    /**
+     * Optionally invert and/or binarize grayscale image.
+     * This is important to match your training edge-map distribution.
+     *
+     * @param {Uint8ClampedArray} gray
+     * @param {boolean} invert
+     * @param {boolean} binarize
+     * @param {number} thr 0..255
+     * @return {Uint8ClampedArray}
+     */
+    function postprocessGray(gray, invert, binarize, thr) {
+      const out = new Uint8ClampedArray(gray.length);
+      for (let i = 0; i < gray.length; i++) {
+        let v = gray[i];
+        if (invert) v = 255 - v;
+        if (binarize) v = (v >= thr) ? 255 : 0;
+        out[i] = v;
+      }
+      return out;
+    }
+
+    /**
+     * Draws grayscale pixels into a canvas for preview.
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {Uint8ClampedArray} grayU8 length = H*W
+     * @param {number} w
+     * @param {number} h
+     */
+    function drawPreviewGray(ctx, grayU8, w, h) {
+      const img = ctx.createImageData(w, h);
+      const out = img.data;
+      for (let i = 0; i < w * h; i++) {
+        const g = grayU8[i];
+        const p = i * 4;
+        out[p + 0] = g;
+        out[p + 1] = g;
+        out[p + 2] = g;
+        out[p + 3] = 255;
+      }
+      ctx.canvas.width = w;
+      ctx.canvas.height = h;
+      ctx.putImageData(img, 0, 0);
+    }
+
+    /**
+     * Converts grayscale Uint8 to float32 values.
+     * Your TF training uses [-1,1] when inputNormSel=m1_1.
+     *
+     * @param {Uint8ClampedArray} grayU8
+     * @param {'0_1'|'m1_1'} mode
+     * @return {Float32Array}
+     */
+    function normalizeGrayToFloat(grayU8, mode) {
+      const out = new Float32Array(grayU8.length);
+      if (mode === 'm1_1') {
+        for (let i = 0; i < grayU8.length; i++) out[i] = (grayU8[i] / 127.5) - 1.0;  // [-1,1]
+      } else {
+        for (let i = 0; i < grayU8.length; i++) out[i] = grayU8[i] / 255.0;          // [0,1]
+      }
+      return out;
+    }
+
+    // -----------------------------
+    // Tensor packing + output rendering
+    // -----------------------------
+    /**
+     * Packs grayscale float data into a tensor.
+     * - NHWC: [1,H,W,1]  (TF/Keras default)
+     * - NCHW: [1,1,H,W]
+     *
+     * @param {Float32Array} grayFloat length = H*W
+     * @param {number} h
+     * @param {number} w
+     * @param {'NHWC'|'NCHW'} layout
+     * @return {ort.Tensor}
+     */
+    function makeGrayInputTensor(grayFloat, h, w, layout) {
+      if (layout === 'NHWC') return new ort.Tensor('float32', grayFloat, [1, h, w, 1]);
+      return new ort.Tensor('float32', grayFloat, [1, 1, h, w]);
+    }
+
+    /**
+     * Maps float output values to uint8 for display.
+     * - m1_1: [-1,1] -> [0,255]
+     * - 0_1 : [0,1]  -> [0,255]
+     * - auto: heuristic
+     *
+     * @param {number} v
+     * @param {'auto'|'0_1'|'m1_1'} range
+     * @return {number}
+     */
+    function floatToU8(v, range) {
+      if (range === 'm1_1') return clampU8((v + 1) * 127.5);
+      if (range === '0_1')  return clampU8(v * 255);
+
+      // Auto guess.
+      if (v >= -1.2 && v <= 1.2) return clampU8((v + 1) * 127.5);
+      if (v >= -0.2 && v <= 1.2) return clampU8(v * 255);
+      return clampU8(v);
+    }
+
+    /**
+     * Draws RGB float tensor to a canvas.
+     * Supports:
+     * - NHWC: [1,H,W,3]  (TF/Keras default)
+     * - NCHW: [1,3,H,W]
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {Float32Array} data
+     * @param {number} h
+     * @param {number} w
+     * @param {'NHWC'|'NCHW'} layout
+     * @param {'auto'|'0_1'|'m1_1'} range
+     * @param {boolean} smoothDisplay
+     */
+    function drawOutputRgb(ctx, data, h, w, layout, range, smoothDisplay) {
+      const img = ctx.createImageData(w, h);
+      const out = img.data;
+
+      if (layout === 'NHWC') {
+        let p = 0;
+        for (let i = 0; i < h * w; i++) {
+          const base = i * 3;
+          out[p++] = floatToU8(data[base + 0], range);
+          out[p++] = floatToU8(data[base + 1], range);
+          out[p++] = floatToU8(data[base + 2], range);
+          out[p++] = 255;
+        }
+      } else {
+        const hw = h * w;
+        let p = 0;
+        for (let i = 0; i < hw; i++) {
+          out[p++] = floatToU8(data[i], range);
+          out[p++] = floatToU8(data[i + hw], range);
+          out[p++] = floatToU8(data[i + 2 * hw], range);
+          out[p++] = 255;
+        }
+      }
+
+      ctx.canvas.width = w;
+      ctx.canvas.height = h;
+
+      // Pixelated vs smooth is purely visual.
+      ctx.canvas.style.imageRendering = smoothDisplay ? 'auto' : 'pixelated';
+      ctx.putImageData(img, 0, 0);
+    }
+
+    // -----------------------------
+    // Model load + inference
+    // -----------------------------
+    /**
+     * Loads the ONNX model into ORT-Web.
+     */
+    async function loadModel() {
+      try {
+        setStatus('Status: loading model...', '');
+
+        // Keep single-threaded to avoid COOP/COEP requirements.
+        ort.env.wasm.numThreads = 1;
+
+        session = await ort.InferenceSession.create(MODEL_URL, {
+          executionProviders: ['wasm'],
+          graphOptimizationLevel: 'all',
+        });
+
+        inputName = session.inputNames[0];
+        outputName = session.outputNames[0];
+
+        // IO metadata may be null depending on model/export.
+        const inMeta = (session.inputMetadata && session.inputMetadata[inputName]) ? session.inputMetadata[inputName] : null;
+        const outMeta = (session.outputMetadata && session.outputMetadata[outputName]) ? session.outputMetadata[outputName] : null;
+
+        dom.ioMetaText.textContent =
+          `Input : ${inputName}\n` +
+          `  type : ${inMeta ? (inMeta.type ?? 'unknown') : 'unknown'}\n` +
+          `  dims : ${inMeta ? JSON.stringify(inMeta.dimensions ?? null) : 'null'}\n\n` +
+          `Output: ${outputName}\n` +
+          `  type : ${outMeta ? (outMeta.type ?? 'unknown') : 'unknown'}\n` +
+          `  dims : ${outMeta ? JSON.stringify(outMeta.dimensions ?? null) : 'null'}`;
+
+        dom.runBtn.disabled = false;
+        dom.saveBtn.disabled = false;
+
+        setStatus('Status: model loaded ✅', 'ok');
+      } catch (e) {
+        console.error('ORT load error:', e);
+        const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
+        setStatus('Status: model load failed ❌\n' + msg, 'err');
+      }
+    }
+
+    /**
+     * Runs a single inference.
+     */
+    async function runInference() {
+      if (!session || !inputName || !outputName) {
+        setStatus('Status: please load the model first.', 'err');
+        return;
+      }
+      const file = dom.fileInput.files && dom.fileInput.files[0];
+      if (!file) {
+        setStatus('Status: please choose an image first.', 'err');
+        return;
+      }
+
+      try {
+        setStatus('Status: preprocessing image...', '');
+
+        // 1) Decode -> grayscale 128x128.
+        const img = await loadImageFromFile(file);
+        const { grayU8: rawGray, width, height } = renderToSquareGray(img, TARGET_SIZE);
+
+        // 2) Postprocess to match training distribution (edge maps).
+        const thr = Number(dom.thrRange.value);
+        dom.thrVal.textContent = String(thr);
+
+        const grayU8 = postprocessGray(rawGray, dom.invertCb.checked, dom.binCb.checked, thr);
+        drawPreviewGray(inputCtx, grayU8, width, height);
+
+        // 3) Normalize and pack tensor.
+        const normMode = /** @type {'0_1'|'m1_1'} */ (dom.inputNormSel.value);
+        const grayFloat = normalizeGrayToFloat(grayU8, normMode);
+
+        const inLayout = /** @type {'NHWC'|'NCHW'} */ (dom.inputLayoutSel.value);
+        const inputTensor = makeGrayInputTensor(grayFloat, TARGET_SIZE, TARGET_SIZE, inLayout);
+
+        setStatus('Status: running inference...', '');
+
+        // 4) Run session.
+        const feeds = {};
+        feeds[inputName] = inputTensor;
+
+        const t0 = performance.now();
+        const results = await session.run(feeds);
+        const t1 = performance.now();
+
+        const outTensor = results[outputName];
+        const outData = (outTensor.data instanceof Float32Array)
+          ? outTensor.data
+          : new Float32Array(outTensor.data);
+
+        // 5) Decide output shape/layout.
+        // We trust runtime outTensor.dims (more reliable than metadata).
+        const dims = outTensor.dims || null;
+
+        // Default TF/Keras generator output is NHWC [1,H,W,3].
+        // But we allow manual override via select.
+        const outLayout = /** @type {'NHWC'|'NCHW'} */ (dom.outputLayoutSel.value);
+
+        let outH = TARGET_SIZE;
+        let outW = TARGET_SIZE;
+
+        if (Array.isArray(dims) && dims.length === 4) {
+          if (outLayout === 'NHWC') {
+            outH = Number(dims[1] ?? TARGET_SIZE);
+            outW = Number(dims[2] ?? TARGET_SIZE);
+          } else {
+            outH = Number(dims[2] ?? TARGET_SIZE);
+            outW = Number(dims[3] ?? TARGET_SIZE);
+          }
+        }
+
+        const outRange = /** @type {'auto'|'0_1'|'m1_1'} */ (dom.outputRangeSel.value);
+        const smoothDisplay = dom.smoothCb.checked;
+
+        drawOutputRgb(outputCtx, outData, outH, outW, outLayout, outRange, smoothDisplay);
+
+        // 6) Debug info.
+        const sample = Array.from(outData.slice(0, 12)).map(v => Number(v).toFixed(3)).join(', ');
+        dom.debugText.textContent =
+          `inputName=${inputName}\n` +
+          `outputName=${outputName}\n` +
+          `inputTensor.dims=${JSON.stringify(inputTensor.dims)} len=${inputTensor.data.length}\n` +
+          `outTensor.type=${outTensor.type} dims=${JSON.stringify(dims)} len=${outData.length}\n` +
+          `outData[0..11]=[${sample}]`;
+
+        dom.inputInfoBadge.textContent = `${inLayout} | ${normMode} | inv=${dom.invertCb.checked ? 1 : 0} | bin=${dom.binCb.checked ? 1 : 0}`;
+        dom.outputInfoBadge.textContent = `${outLayout} | ${outRange} | ${(t1 - t0).toFixed(1)} ms`;
+
+        lastOutputDataUrl = dom.outputCanvas.toDataURL('image/png');
+        setStatus(`Status: done   Inference ${(t1 - t0).toFixed(2)} ms`, 'ok');
+      } catch (e) {
+        console.error('ORT run error:', e);
+        const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
+        setStatus('Status: inference failed \n' + msg, 'err');
+      }
+    }
+
+    /**
+     * Saves the output canvas as a PNG.
+     */
+    function saveOutputPng() {
+      if (!lastOutputDataUrl) {
+        setStatus('Status: nothing to save yet. Run inference first.', 'err');
+        return;
+      }
+      const a = document.createElement('a');
+      a.download = 'gan_output.png';
+      a.href = lastOutputDataUrl;
+      a.click();
+    }
+
+    // -----------------------------
+    // Event wiring
+    // -----------------------------
+    dom.modelUrlText.textContent = MODEL_URL;
+    dom.thrVal.textContent = dom.thrRange.value;
+
+    dom.thrRange.addEventListener('input', () => {
+      dom.thrVal.textContent = dom.thrRange.value;
+    });
+
+    dom.loadBtn.addEventListener('click', loadModel);
+    dom.runBtn.addEventListener('click', runInference);
+    dom.saveBtn.addEventListener('click', saveOutputPng);
+
+    dom.fileInput.addEventListener('change', async () => {
+      const file = dom.fileInput.files && dom.fileInput.files[0];
+      if (!file) return;
+      try {
+        const img = await loadImageFromFile(file);
+        const { grayU8: rawGray, width, height } = renderToSquareGray(img, TARGET_SIZE);
+
+        const thr = Number(dom.thrRange.value);
+        const grayU8 = postprocessGray(rawGray, dom.invertCb.checked, dom.binCb.checked, thr);
+        drawPreviewGray(inputCtx, grayU8, width, height);
+
+        setStatus('Status: image selected. (Click Run)', '');
+      } catch (e) {
+        console.error(e);
+        setStatus('Status: failed to preview image.', 'err');
+      }
+    });
+
+    clearCanvas(inputCtx);
+    clearCanvas(outputCtx);
+    setStatus('Status: idle', '');
+  </script>
+</body>
+</html>
